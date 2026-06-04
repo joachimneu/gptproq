@@ -10,8 +10,7 @@ cp .devcontainer/config/starship.toml ~/.config/starship.toml
 # Rebuild Python virtual environment inside the container
 # (A .venv created on the host may have incompatible platform binaries)
 rm -rf .venv
-uv venv
-uv sync || uv pip install -r requirements.txt
+uv sync
 
 # Install Claude Code CLI (native installer, auto-updates)
 curl -fsSL https://claude.ai/install.sh | bash
