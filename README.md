@@ -109,7 +109,7 @@ these and may override `model` / `reasoning_effort` / `mode`.
 
 ```bash
 uv run gptproq config init                       # write ~/.gptproq with all defaults
-uv run gptproq config set api_key sk-...
+uv run gptproq login                             # prompt for the API key (hidden) and save it
 uv run gptproq config set mode batch             # background | batch
 uv run gptproq config set reasoning_effort xhigh # low | medium | high | xhigh (default)
 uv run gptproq config set reasoning_summary auto # auto | concise | detailed | none
@@ -127,7 +127,8 @@ default. If you upgrade and a key is missing, backfill it:
 uv run gptproq config init-missing               # add missing keys, keep existing values
 ```
 
-The API key is read **only** from `~/.gptproq` (`config set api_key …`).
+The API key is read **only** from `~/.gptproq`; set it with `gptproq login`
+(interactive, hidden — keeps it out of your shell history) or `config set api_key …`.
 
 ## Use
 

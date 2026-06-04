@@ -138,6 +138,18 @@ def prompt_clone(
 
 
 @app.command()
+def login() -> None:
+    """Prompt for your OpenAI API key (hidden) and save it to ~/.gptproq."""
+    key = typer.prompt("OpenAI API key", hide_input=True)
+    if not key:
+        typer.echo("No key entered; nothing saved.", err=True)
+        raise typer.Exit(1)
+    config.init_missing()  # ensure ~/.gptproq exists with all keys
+    config.set_value("api_key", key)
+    typer.echo(f"Saved API key to {config.config_path()}")
+
+
+@app.command()
 def sync(
     directory: Annotated[
         Path | None, typer.Option("--dir", "-d", help="Queue directory (default from config).")
