@@ -86,9 +86,20 @@ gptproq --install-completion   # detect shell and install
 gptproq --show-completion      # just print the script
 ```
 
-Completion fires for the `gptproq` command itself, so use an environment where
-that's directly callable — `source .venv/bin/activate` (then `gptproq …`) or
-`uv tool install .` — rather than `uv run gptproq`.
+Completion is dispatched by your shell on the **first word** of the command line,
+and `uv run` does not forward completion to the program it runs
+([astral-sh/uv#18827](https://github.com/astral-sh/uv/issues/18827)) — so
+`uv run gptproq <TAB>` can't complete. The installed completer also invokes the
+program as `env … gptproq`, which only finds a **real executable on `PATH`** — so a
+shell **alias or wrapper function won't enable completion either** (neither is
+visible to `env`; an alias is also expanded to `uv run …` before completion). Put
+`gptproq` on `PATH`, then install against it:
+
+```bash
+uv tool install .            # global, persistent gptproq on PATH
+# or per shell: source .venv/bin/activate
+gptproq --install-completion
+```
 
 ## Configure
 
