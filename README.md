@@ -77,6 +77,19 @@ uv sync
 uv run gptproq --help
 ```
 
+## Shell completion
+
+Completion is built in (Typer/Click). Install it for your shell, then restart the shell:
+
+```bash
+gptproq --install-completion   # detect shell and install
+gptproq --show-completion      # just print the script
+```
+
+Completion fires for the `gptproq` command itself, so use an environment where
+that's directly callable — `source .venv/bin/activate` (then `gptproq …`) or
+`uv tool install .` — rather than `uv run gptproq`.
+
 ## Configure
 
 All settings live in `~/.gptproq` (TOML, created `0600`). `config init` writes the
@@ -87,7 +100,7 @@ these and may override `model` / `reasoning_effort` / `mode`.
 uv run gptproq config init                       # write ~/.gptproq with all defaults
 uv run gptproq config set api_key sk-...
 uv run gptproq config set mode batch             # background | batch
-uv run gptproq config set reasoning_effort high  # low | medium | high | xhigh
+uv run gptproq config set reasoning_effort xhigh # low | medium | high | xhigh (default)
 uv run gptproq config set reasoning_summary auto # auto | concise | detailed | none
 uv run gptproq config set model gpt-5.5-pro
 uv run gptproq config get queue_dir

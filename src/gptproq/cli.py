@@ -11,7 +11,7 @@ from .models import Effort, Mode, ReasoningSummary
 from .sync import run_sync
 
 app = typer.Typer(
-    add_completion=False,
+    add_completion=True,
     no_args_is_help=True,
     help="GPT Pro Queue — offload big reasoning prompts to OpenAI and collect answers later.",
 )

@@ -45,7 +45,7 @@ class Kind(StrEnum):
     INPUT_IMAGE = "input_image"
 
 
-DEFAULT_EFFORT = Effort.HIGH
+DEFAULT_EFFORT = Effort.XHIGH  # the maximum gpt-5.5-pro supports
 DEFAULT_MODE = Mode.BACKGROUND
 DEFAULT_SUMMARY = ReasoningSummary.AUTO
 

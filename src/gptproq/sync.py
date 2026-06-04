@@ -58,11 +58,17 @@ class _Ctx:
 def run_sync(
     settings: Settings, queue: Path, *, verbose: bool = False, log: Logger = print
 ) -> Summary:
+    folders = store.prompt_dirs(queue)
+    if not folders:
+        log(f"no prompt folders in {queue}")
+        return Summary()
+
+    log(f"{'before:':<9}{_census_line(folders)}")
     if not settings.api_key:
         raise SystemExit("No API key set. Run `gptproq config set api_key <token>`.")
     ctx = _Ctx(OpenAI(api_key=settings.api_key), settings, Summary(), log, verbose)
 
-    for folder in store.prompt_dirs(queue):
+    for folder in folders:
         try:
             _drive(ctx, folder)
         except (AuthenticationError, PermissionDeniedError) as exc:
@@ -79,7 +85,8 @@ def run_sync(
                 ctx.summary.errors += 1
                 log(f"  {folder.name}: ERROR ({type(exc).__name__}); wrote {store.ERROR}")
 
-    log(ctx.summary.line())
+    log(f"{'changes:':<9}{ctx.summary.line()}")
+    log(f"{'after:':<9}{_census_line(folders)}")
     return ctx.summary
 
 
@@ -209,3 +216,11 @@ def _warn_on_drift(folder: Path, log: Logger) -> None:
 def _custom_id(name: str) -> str:
     safe = "".join(c if c.isalnum() or c in "-_" else "-" for c in name)
     return safe[:60] or "task"
+
+
+def _census_line(folders: list[Path]) -> str:
+    """`new=… ready=… running=… done=… failed=…` over the given prompt folders."""
+    counts = dict.fromkeys(TaskState, 0)
+    for folder in folders:
+        counts[store.classify(folder)] += 1
+    return " ".join(f"{state.value}={counts[state]}" for state in TaskState)
