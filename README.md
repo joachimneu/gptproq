@@ -48,14 +48,17 @@ it before the first `sync`.
 
 Every non-magic file in a folder is sent, routed by type:
 
-- **text / code** (`.md`, `.py`, `.txt`, …) → inlined into the prompt text under
+- **text / code** (`.md`, `.py`, `.tex`, …) → inlined into the prompt text under
   a `===== file: name =====` header.
-- **PDFs** → uploaded as a file input (the model gets text + page images).
-- **spreadsheets** (`.csv`, `.xlsx`, …) → uploaded as a file input.
-- **images** (`.png`, `.jpg`, …) → uploaded as an image input.
-- anything else → uploaded as a file input.
+- **PDFs** → sent inline as a file input (the model gets text + page images).
+- **spreadsheets** (`.csv`, `.xlsx`, …) → sent inline as a file input.
+- **images** (`.png`, `.jpg`, …) → sent inline as an image input.
+- anything else → sent inline as a file input.
 
-Uploaded files' ids are cached in `STATE.json` so re-runs don't re-upload.
+Everything is sent **inline (base64)**, so background runs leave **no files in
+your OpenAI storage**. Batch mode must upload its request as a file (named
+`gptproq-<prompt>-<uuid>.jsonl`) and OpenAI returns result files; gptproq deletes
+all of them automatically once it has read the answer.
 
 ### Backends
 
@@ -85,6 +88,7 @@ uv run gptproq config init                       # write ~/.gptproq with all def
 uv run gptproq config set api_key sk-...
 uv run gptproq config set mode batch             # background | batch
 uv run gptproq config set reasoning_effort high  # low | medium | high | xhigh
+uv run gptproq config set reasoning_summary auto # auto | concise | detailed | none
 uv run gptproq config set model gpt-5.5-pro
 uv run gptproq config get queue_dir
 uv run gptproq config path
@@ -129,3 +133,7 @@ so you can also just `cd` into your queue and run `gptproq sync`.
   unretrievable response is recorded as `expired` in `ERROR.txt`.
 - Transient API errors (timeouts, rate limits, 5xx) aren't recorded as failures;
   they retry on the next run.
+- `reasoning_summary` (default `auto`) controls how much of the model's thinking
+  is returned and appended to `OUTPUT.md`. It only adds the summary's own small
+  token count — the real cost lever is `reasoning_effort`. Detailed summaries on
+  the latest models may require organization verification; use `none` to disable.

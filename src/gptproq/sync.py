@@ -1,4 +1,13 @@
-"""Reconcile the queue directory against the OpenAI backends (the ``sync`` loop)."""
+"""Reconcile the queue directory against the OpenAI backends (the ``sync`` loop).
+
+The per-prompt state machine is explicit. For each prompt, ``_drive`` repeatedly:
+``classify`` the current state from the magic files present → call that state's
+handler → the handler performs the transition and returns whether the prompt
+**advanced** to a state that is actionable right now (loop again) or is now
+**waiting on the API / terminal** (stop until the next ``sync``). Adding a state
+means adding an enum member, a handler, and a ``_HANDLERS`` entry — nothing else
+makes assumptions about the ordering.
+"""
 
 from __future__ import annotations
 
@@ -37,30 +46,25 @@ class Summary:
         return text
 
 
+@dataclass
+class _Ctx:
+    client: OpenAI
+    settings: Settings
+    summary: Summary
+    log: Logger
+    verbose: bool
+
+
 def run_sync(
     settings: Settings, queue: Path, *, verbose: bool = False, log: Logger = print
 ) -> Summary:
     if not settings.api_key:
         raise SystemExit("No API key set. Run `gptproq config set api_key <token>`.")
-    client = OpenAI(api_key=settings.api_key)
-    summary = Summary()
+    ctx = _Ctx(OpenAI(api_key=settings.api_key), settings, Summary(), log, verbose)
 
     for folder in store.prompt_dirs(queue):
-        name = folder.name
         try:
-            state = store.classify(folder)
-            if state is TaskState.DONE:
-                _warn_on_drift(folder, log)
-            elif state is TaskState.FAILED:
-                if verbose:
-                    log(f"  {name}: failed (see {store.ERROR})")
-            elif state is TaskState.RUNNING:
-                _poll_one(client, folder, summary, log, verbose=verbose)
-            else:  # NEW or READY — configure if needed, then submit, in one pass
-                if state is TaskState.NEW:
-                    # NEW -> READY: seed CONFIG.json from the global defaults.
-                    store.write_config(folder, settings.task_defaults())
-                _submit_one(client, folder, summary, log)  # READY -> RUNNING
+            _drive(ctx, folder)
         except (AuthenticationError, PermissionDeniedError) as exc:
             raise SystemExit(
                 f"Authentication failed ({exc}). Check `gptproq config get api_key`."
@@ -68,71 +72,126 @@ def run_sync(
         except Exception as exc:
             # Isolate failures to one prompt; transient errors retry next run.
             if is_transient(exc):
-                summary.deferred += 1
-                log(f"  {name}: transient error ({type(exc).__name__}); retrying next run")
+                ctx.summary.deferred += 1
+                log(f"  {folder.name}: transient error ({type(exc).__name__}); retrying next run")
             else:
                 store.write_error(folder, f"{type(exc).__name__}: {exc}")
-                summary.errors += 1
-                log(f"  {name}: ERROR ({type(exc).__name__}); wrote {store.ERROR}")
+                ctx.summary.errors += 1
+                log(f"  {folder.name}: ERROR ({type(exc).__name__}); wrote {store.ERROR}")
 
-    log(summary.line())
-    return summary
+    log(ctx.summary.line())
+    return ctx.summary
 
 
-def _submit_one(client: OpenAI, folder: Path, summary: Summary, log: Logger) -> None:
+def _drive(ctx: _Ctx, folder: Path) -> None:
+    """Advance one prompt until it waits on the API or reaches a terminal state."""
+    for _ in range(len(TaskState)):  # bounded: each step advances at most one state
+        advanced = _HANDLERS[store.classify(folder)](ctx, folder)
+        if not advanced:
+            return
+
+
+# --- State transition handlers ----------------------------------------------------
+# Each handler performs the work for its state and returns True if the prompt
+# advanced to a state we can act on again right now (loop), or False if it is now
+# waiting on the API / is terminal (stop until the next sync).
+
+
+def _on_new(ctx: _Ctx, folder: Path) -> bool:
+    # NEW (only PROMPT.md) -> READY: seed CONFIG.json from the global defaults.
+    store.write_config(folder, ctx.settings.task_defaults())
+    return True  # READY is actionable right now
+
+
+def _on_ready(ctx: _Ctx, folder: Path) -> bool:
+    # READY (PROMPT.md + CONFIG.json) -> RUNNING: submit the job.
     cfg = store.read_config(folder)
     prompt_text = store.read_prompt(folder)
     if not prompt_text.strip():
-        log(f"  {folder.name}: empty {store.PROMPT}, skipping")
-        return
-
+        ctx.log(f"  {folder.name}: empty {store.PROMPT}, skipping")
+        return False
     attachments = store.gather_attachments(folder)
-    input_arr = build_input(client, folder, prompt_text, attachments)
-    spec = Spec(model=cfg.model, reasoning_effort=cfg.reasoning_effort.value, input=input_arr)
-
-    result = make_backend(cfg.mode, client).submit(spec, _custom_id(folder.name))
-
-    state = StateFile(
-        mode=cfg.mode,
+    spec = Spec(
         model=cfg.model,
-        reasoning_effort=cfg.reasoning_effort,
-        status=result.status,
-        submitted_at=utcnow_iso(),
-        prompt_sha256=store.sha256_text(prompt_text),
-        attachments=attachments,
-        job=result.job,
-        gptproq_version=__version__,
+        reasoning_effort=cfg.reasoning_effort.value,
+        reasoning_summary=cfg.reasoning_summary.value,
+        input=build_input(folder, prompt_text, attachments),
     )
-    store.write_state(folder, state)
-    summary.submitted += 1
+    result = make_backend(cfg.mode, ctx.client).submit(spec, _custom_id(folder.name))
+    store.write_state(
+        folder,
+        StateFile(
+            mode=cfg.mode,
+            model=cfg.model,
+            reasoning_effort=cfg.reasoning_effort,
+            reasoning_summary=cfg.reasoning_summary,
+            status=result.status,
+            submitted_at=utcnow_iso(),
+            prompt_sha256=store.sha256_text(prompt_text),
+            attachments=attachments,
+            job=result.job,
+            gptproq_version=__version__,
+        ),
+    )
+    ctx.summary.submitted += 1
     job_id = result.job.batch_id or result.job.response_id
-    log(f"  {folder.name}: submitted [{cfg.mode}] ({job_id})")
+    ctx.log(f"  {folder.name}: submitted [{cfg.mode}] ({job_id})")
+    return False  # now waiting on the API
 
 
-def _poll_one(
-    client: OpenAI, folder: Path, summary: Summary, log: Logger, *, verbose: bool
-) -> None:
+def _on_running(ctx: _Ctx, folder: Path) -> bool:
+    # RUNNING (+ STATE.json) -> poll: stays RUNNING, or becomes DONE / FAILED.
     state = store.read_state(folder)
-    result = make_backend(state.mode, client).poll(state.job)
+    result = make_backend(state.mode, ctx.client).poll(state.job)
     state.status = result.status
-
     if result.status is Status.COMPLETED:
-        store.write_output(folder, result.output_text or "")
+        store.write_output(folder, _compose_output(result.output_text, result.reasoning))
         state.completed_at = utcnow_iso()
         state.usage = result.usage
         store.write_state(folder, state)
-        summary.completed += 1
-        log(f"  {folder.name}: completed -> {store.OUTPUT}")
+        ctx.summary.completed += 1
+        ctx.log(f"  {folder.name}: completed -> {store.OUTPUT}")
     elif result.status.is_terminal:
         store.write_state(folder, state)
         store.write_error(folder, result.error or result.status.value)
-        summary.errors += 1
-        log(f"  {folder.name}: {result.status.value}; wrote {store.ERROR}")
+        ctx.summary.errors += 1
+        ctx.log(f"  {folder.name}: {result.status.value}; wrote {store.ERROR}")
     else:
         store.write_state(folder, state)
-        summary.pending += 1
-        if verbose:
-            log(f"  {folder.name}: {result.status.value}")
+        ctx.summary.pending += 1
+        if ctx.verbose:
+            ctx.log(f"  {folder.name}: {result.status.value}")
+    return False  # waiting on the API, or just reached a terminal state
+
+
+def _on_done(ctx: _Ctx, folder: Path) -> bool:
+    _warn_on_drift(folder, ctx.log)
+    return False
+
+
+def _on_failed(ctx: _Ctx, folder: Path) -> bool:
+    if ctx.verbose:
+        ctx.log(f"  {folder.name}: failed (see {store.ERROR})")
+    return False
+
+
+_HANDLERS: dict[TaskState, Callable[[_Ctx, Path], bool]] = {
+    TaskState.NEW: _on_new,
+    TaskState.READY: _on_ready,
+    TaskState.RUNNING: _on_running,
+    TaskState.DONE: _on_done,
+    TaskState.FAILED: _on_failed,
+}
+
+
+# --- helpers ----------------------------------------------------------------------
+
+
+def _compose_output(answer: str | None, reasoning: str | None) -> str:
+    text = (answer or "").rstrip("\n")
+    if reasoning:
+        text += "\n\n---\n\n## Reasoning summary\n\n" + reasoning.strip()
+    return text
 
 
 def _warn_on_drift(folder: Path, log: Logger) -> None:

@@ -9,7 +9,16 @@ from pathlib import Path
 import tomlkit
 from pydantic import BaseModel, ValidationError
 
-from .models import DEFAULT_EFFORT, DEFAULT_MODE, DEFAULT_MODEL, Effort, Mode, TaskConfig
+from .models import (
+    DEFAULT_EFFORT,
+    DEFAULT_MODE,
+    DEFAULT_MODEL,
+    DEFAULT_SUMMARY,
+    Effort,
+    Mode,
+    ReasoningSummary,
+    TaskConfig,
+)
 
 CONFIG_PATH = Path.home() / ".gptproq"
 
@@ -17,6 +26,7 @@ DEFAULTS: dict[str, str] = {
     "api_key": "",
     "model": DEFAULT_MODEL,
     "reasoning_effort": str(DEFAULT_EFFORT),
+    "reasoning_summary": str(DEFAULT_SUMMARY),
     "mode": str(DEFAULT_MODE),
     "queue_dir": ".",
 }
@@ -33,6 +43,7 @@ class _FileConfig(BaseModel):
     api_key: str
     model: str
     reasoning_effort: Effort
+    reasoning_summary: ReasoningSummary
     mode: Mode
     queue_dir: str
 
@@ -43,12 +54,18 @@ class Settings(BaseModel):
     api_key: str | None
     model: str
     reasoning_effort: Effort
+    reasoning_summary: ReasoningSummary
     mode: Mode
     queue_dir: Path
 
     def task_defaults(self) -> TaskConfig:
         """The per-prompt config a new prompt folder is seeded with."""
-        return TaskConfig(model=self.model, reasoning_effort=self.reasoning_effort, mode=self.mode)
+        return TaskConfig(
+            model=self.model,
+            reasoning_effort=self.reasoning_effort,
+            reasoning_summary=self.reasoning_summary,
+            mode=self.mode,
+        )
 
 
 def config_path() -> Path:
@@ -126,6 +143,7 @@ def load_settings() -> Settings:
         api_key=fc.api_key or None,
         model=fc.model,
         reasoning_effort=fc.reasoning_effort,
+        reasoning_summary=fc.reasoning_summary,
         mode=fc.mode,
         queue_dir=Path(fc.queue_dir).expanduser(),
     )

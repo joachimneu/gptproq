@@ -7,7 +7,7 @@ import typer
 
 from . import config, store
 from .config import ConfigError, Settings
-from .models import Effort, Mode
+from .models import Effort, Mode, ReasoningSummary
 from .sync import run_sync
 
 app = typer.Typer(
@@ -19,14 +19,6 @@ config_app = typer.Typer(no_args_is_help=True, help="Manage the ~/.gptproq confi
 prompt_app = typer.Typer(no_args_is_help=True, help="Create and copy prompt folders.")
 app.add_typer(config_app, name="config")
 app.add_typer(prompt_app, name="prompt")
-
-
-def _mask(secret: str) -> str:
-    if not secret:
-        return "(empty)"
-    if len(secret) <= 8:
-        return "****"
-    return f"{secret[:4]}…{secret[-4:]}"
 
 
 def _load_settings() -> Settings:
@@ -64,12 +56,12 @@ def config_path_cmd() -> None:
 
 @config_app.command("get")
 def config_get(key: str) -> None:
-    """Print a config value (api_key is masked)."""
+    """Print a config value."""
     value = config.get_value(key)
     if value is None:
         typer.echo(f"{key} is not set", err=True)
         raise typer.Exit(1)
-    typer.echo(_mask(value) if key == "api_key" else value)
+    typer.echo(value)
 
 
 @config_app.command("set")
@@ -86,8 +78,12 @@ def config_set(key: str, value: str) -> None:
         choices = ", ".join(m.value for m in Mode)
         typer.echo(f"Invalid mode '{value}'. Choose from: {choices}", err=True)
         raise typer.Exit(1)
+    if key == "reasoning_summary" and value not in {s.value for s in ReasoningSummary}:
+        choices = ", ".join(s.value for s in ReasoningSummary)
+        typer.echo(f"Invalid reasoning_summary '{value}'. Choose from: {choices}", err=True)
+        raise typer.Exit(1)
     config.set_value(key, value)
-    typer.echo(f"Set {key} = {_mask(value) if key == 'api_key' else value}")
+    typer.echo(f"Set {key} = {value}")
 
 
 @prompt_app.command("new")

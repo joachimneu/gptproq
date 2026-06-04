@@ -28,6 +28,15 @@ class Mode(StrEnum):
     BATCH = "batch"
 
 
+class ReasoningSummary(StrEnum):
+    """How much of the model's reasoning to surface in the output."""
+
+    AUTO = "auto"  # most detailed summary the model supports
+    CONCISE = "concise"
+    DETAILED = "detailed"
+    NONE = "none"  # don't request a summary
+
+
 class Kind(StrEnum):
     """How an attachment is delivered to the model."""
 
@@ -38,6 +47,7 @@ class Kind(StrEnum):
 
 DEFAULT_EFFORT = Effort.HIGH
 DEFAULT_MODE = Mode.BACKGROUND
+DEFAULT_SUMMARY = ReasoningSummary.AUTO
 
 
 class Status(StrEnum):
@@ -76,7 +86,6 @@ class Attachment(BaseModel):
     path: str  # relative to the prompt folder
     sha256: str
     kind: Kind
-    file_id: str | None = None
 
 
 class Job(BaseModel):
@@ -94,6 +103,7 @@ class TaskConfig(BaseModel):
 
     model: str = DEFAULT_MODEL
     reasoning_effort: Effort = DEFAULT_EFFORT
+    reasoning_summary: ReasoningSummary = DEFAULT_SUMMARY
     mode: Mode = DEFAULT_MODE
 
 
@@ -103,6 +113,7 @@ class StateFile(BaseModel):
     mode: Mode
     model: str
     reasoning_effort: Effort
+    reasoning_summary: ReasoningSummary = DEFAULT_SUMMARY
     status: Status
     submitted_at: str
     completed_at: str | None = None
