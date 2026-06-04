@@ -92,6 +92,7 @@ uv run gptproq config set reasoning_summary auto # auto | concise | detailed | n
 uv run gptproq config set model gpt-5.5-pro
 uv run gptproq config get queue_dir
 uv run gptproq config path
+uv run gptproq config cat                        # print the whole config file
 ```
 
 The config is **strictly validated** when read: every expected key must be

@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) and other coding age
 ## Commands
 
 - Install / sync deps: `uv sync`
-- Run the CLI: `uv run gptproq <command>` (also `python -m gptproq`). Commands: `config` (`init`/`init-missing`/`get`/`set`/`path`), `prompt` (`new <name>` / `clone <src> <name>`), `sync`.
+- Run the CLI: `uv run gptproq <command>` (also `python -m gptproq`). Commands: `config` (`init`/`init-missing`/`get`/`set`/`path`/`cat`), `prompt` (`new <name>` / `clone <src> <name>`), `sync`.
 - Lint: `uv run ruff check .` — Format: `uv run ruff format .` (CI check: `uv run ruff format --check .`)
 - **No test suite — by design.** Verify with `ruff`, `uv run gptproq --help`, and a live smoke test (needs a key in `~/.gptproq`; spends money). After touching `backend.py`, confirm the OpenAI call surface offline by instantiating `OpenAI(api_key="x")` and asserting `responses.create` accepts `background`/`store`/`reasoning` and that `batches.create`/`batches.retrieve`/`files.content` exist.
 

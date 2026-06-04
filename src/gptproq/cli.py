@@ -54,6 +54,16 @@ def config_path_cmd() -> None:
     typer.echo(str(config.config_path()))
 
 
+@config_app.command("cat")
+def config_cat() -> None:
+    """Print the raw contents of ~/.gptproq."""
+    path = config.config_path()
+    if not path.exists():
+        typer.echo(f"No config file at {path}. Run `gptproq config init`.", err=True)
+        raise typer.Exit(1)
+    typer.echo(path.read_text(encoding="utf-8"), nl=False)
+
+
 @config_app.command("get")
 def config_get(key: str) -> None:
     """Print a config value."""
