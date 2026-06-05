@@ -145,7 +145,13 @@ uv run gptproq prompt clone my-analysis my-analysis-v2 -d ~/queue
 The queue directory comes from `-d`, else the `queue_dir` setting (default `.`),
 so you can also just `cd` into your queue and run `gptproq sync`.
 
-`sync` prints a one-line summary and exits, so it drops into cron:
+`sync` prints before/after state counts around the changes and exits. Have it
+self-loop with `--interval`/`-n` (seconds, like `watch -n`; Ctrl-C to stop), or
+schedule it with cron:
+
+```bash
+uv run gptproq sync -d ~/queue -n 600    # re-sync every 10 minutes
+```
 
 ```cron
 */10 * * * * cd ~/queue && uv run gptproq sync >> .sync.log 2>&1

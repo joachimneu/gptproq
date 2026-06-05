@@ -1,5 +1,6 @@
 """Typer CLI entry point for gptproq."""
 
+import time
 from pathlib import Path
 from typing import Annotated
 
@@ -157,11 +158,31 @@ def sync(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Show per-prompt status.")
     ] = False,
+    interval: Annotated[
+        float | None,
+        typer.Option("--interval", "-n", help="Loop: sync every N seconds (default: once)."),
+    ] = None,
 ) -> None:
-    """Submit new prompts, poll in-flight jobs, and write completed answers."""
+    """Submit new prompts, poll in-flight jobs, and write completed answers.
+
+    With --interval, keep syncing forever, sleeping that many seconds between runs
+    (Ctrl-C to stop).
+    """
     settings = _load_settings()
     queue = directory or settings.queue_dir
     if not queue.is_dir():
         typer.echo(f"Queue directory not found: {queue}", err=True)
         raise typer.Exit(1)
-    run_sync(settings, queue, verbose=verbose)
+    if interval is None:
+        run_sync(settings, queue, verbose=verbose)
+        return
+    if interval <= 0:
+        typer.echo("--interval must be a positive number of seconds.", err=True)
+        raise typer.Exit(1)
+    try:
+        while True:
+            typer.echo(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]")
+            run_sync(settings, queue, verbose=verbose)
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        typer.echo("\nstopped")
