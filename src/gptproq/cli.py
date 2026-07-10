@@ -8,7 +8,7 @@ import typer
 
 from . import config, store
 from .config import ConfigError, Settings
-from .models import Effort, Mode, ReasoningSummary
+from .models import Effort, Mode, ReasoningMode, ReasoningSummary
 from .sync import run_sync
 
 app = typer.Typer(
@@ -92,6 +92,10 @@ def config_set(key: str, value: str) -> None:
     if key == "reasoning_summary" and value not in {s.value for s in ReasoningSummary}:
         choices = ", ".join(s.value for s in ReasoningSummary)
         typer.echo(f"Invalid reasoning_summary '{value}'. Choose from: {choices}", err=True)
+        raise typer.Exit(1)
+    if key == "reasoning_mode" and value not in {m.value for m in ReasoningMode}:
+        choices = ", ".join(m.value for m in ReasoningMode)
+        typer.echo(f"Invalid reasoning_mode '{value}'. Choose from: {choices}", err=True)
         raise typer.Exit(1)
     config.set_value(key, value)
     typer.echo(f"Set {key} = {value}")

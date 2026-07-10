@@ -13,9 +13,11 @@ from .models import (
     DEFAULT_EFFORT,
     DEFAULT_MODE,
     DEFAULT_MODEL,
+    DEFAULT_REASONING_MODE,
     DEFAULT_SUMMARY,
     Effort,
     Mode,
+    ReasoningMode,
     ReasoningSummary,
     TaskConfig,
 )
@@ -27,6 +29,7 @@ DEFAULTS: dict[str, str] = {
     "model": DEFAULT_MODEL,
     "reasoning_effort": str(DEFAULT_EFFORT),
     "reasoning_summary": str(DEFAULT_SUMMARY),
+    "reasoning_mode": str(DEFAULT_REASONING_MODE),
     "mode": str(DEFAULT_MODE),
     "queue_dir": ".",
 }
@@ -44,6 +47,7 @@ class _FileConfig(BaseModel):
     model: str
     reasoning_effort: Effort
     reasoning_summary: ReasoningSummary
+    reasoning_mode: ReasoningMode
     mode: Mode
     queue_dir: str
 
@@ -55,6 +59,7 @@ class Settings(BaseModel):
     model: str
     reasoning_effort: Effort
     reasoning_summary: ReasoningSummary
+    reasoning_mode: ReasoningMode
     mode: Mode
     queue_dir: Path
 
@@ -64,6 +69,7 @@ class Settings(BaseModel):
             model=self.model,
             reasoning_effort=self.reasoning_effort,
             reasoning_summary=self.reasoning_summary,
+            reasoning_mode=self.reasoning_mode,
             mode=self.mode,
         )
 
@@ -144,6 +150,7 @@ def load_settings() -> Settings:
         model=fc.model,
         reasoning_effort=fc.reasoning_effort,
         reasoning_summary=fc.reasoning_summary,
+        reasoning_mode=fc.reasoning_mode,
         mode=fc.mode,
         queue_dir=Path(fc.queue_dir).expanduser(),
     )

@@ -122,6 +122,7 @@ def _on_ready(ctx: _Ctx, folder: Path) -> bool:
         model=cfg.model,
         reasoning_effort=cfg.reasoning_effort.value,
         reasoning_summary=cfg.reasoning_summary.value,
+        reasoning_mode=cfg.reasoning_mode.value,
         input=build_input(folder, prompt_text, attachments),
     )
     result = make_backend(cfg.mode, ctx.client).submit(spec, _custom_id(folder.name))
@@ -132,6 +133,7 @@ def _on_ready(ctx: _Ctx, folder: Path) -> bool:
             model=cfg.model,
             reasoning_effort=cfg.reasoning_effort,
             reasoning_summary=cfg.reasoning_summary,
+            reasoning_mode=cfg.reasoning_mode,
             status=result.status,
             submitted_at=utcnow_iso(),
             prompt_sha256=store.sha256_text(prompt_text),

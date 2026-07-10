@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-DEFAULT_MODEL = "gpt-5.5-pro"
+DEFAULT_MODEL = "gpt-5.6-sol"  # flagship; alias `gpt-5.6` also routes here
 
 
 def utcnow_iso() -> str:
@@ -21,11 +21,21 @@ class Effort(StrEnum):
     MEDIUM = "medium"
     HIGH = "high"
     XHIGH = "xhigh"
+    MAX = "max"  # new for gpt-5.6; the deepest reasoning, for hardest quality-first work
 
 
 class Mode(StrEnum):
+    """Delivery backend — how the job is submitted (not the model's reasoning mode)."""
+
     BACKGROUND = "background"
     BATCH = "batch"
+
+
+class ReasoningMode(StrEnum):
+    """gpt-5.6 ``reasoning.mode`` — how hard the model works before answering."""
+
+    STANDARD = "standard"
+    PRO = "pro"  # more model work, one final answer; for difficult, quality-critical tasks
 
 
 class ReasoningSummary(StrEnum):
@@ -45,9 +55,10 @@ class Kind(StrEnum):
     INPUT_IMAGE = "input_image"
 
 
-DEFAULT_EFFORT = Effort.XHIGH  # the maximum gpt-5.5-pro supports
+DEFAULT_EFFORT = Effort.MAX  # the deepest gpt-5.6-sol supports; suits STEM research
 DEFAULT_MODE = Mode.BACKGROUND
 DEFAULT_SUMMARY = ReasoningSummary.AUTO
+DEFAULT_REASONING_MODE = ReasoningMode.PRO  # quality-first default for hard reasoning
 
 
 class Status(StrEnum):
@@ -104,6 +115,7 @@ class TaskConfig(BaseModel):
     model: str = DEFAULT_MODEL
     reasoning_effort: Effort = DEFAULT_EFFORT
     reasoning_summary: ReasoningSummary = DEFAULT_SUMMARY
+    reasoning_mode: ReasoningMode = DEFAULT_REASONING_MODE
     mode: Mode = DEFAULT_MODE
 
 
@@ -114,6 +126,7 @@ class StateFile(BaseModel):
     model: str
     reasoning_effort: Effort
     reasoning_summary: ReasoningSummary = DEFAULT_SUMMARY
+    reasoning_mode: ReasoningMode = DEFAULT_REASONING_MODE
     status: Status
     submitted_at: str
     completed_at: str | None = None

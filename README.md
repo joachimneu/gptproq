@@ -2,7 +2,8 @@
 
 **GPT Pro Queue** — a filesystem-as-database job queue for offloading large,
 curated reasoning prompts (with attachments) to OpenAI's most capable models
-(default `gpt-5.5-pro`) and collecting the answers later.
+(default `gpt-5.6-sol` at `max` effort in `pro` reasoning mode — tuned for hard
+STEM/research reasoning) and collecting the answers later.
 
 You write each prompt as a **folder** of files, then run `gptproq sync` whenever
 you like (by hand or from cron). It submits new prompts, polls running ones, and
@@ -105,15 +106,16 @@ gptproq --install-completion
 
 All settings live in `~/.gptproq` (TOML, created `0600`). `config init` writes the
 file with every key at its default; each prompt's `CONFIG.json` is seeded from
-these and may override `model` / `reasoning_effort` / `mode`.
+these and may override `model` / `reasoning_effort` / `reasoning_mode` / `mode`.
 
 ```bash
 uv run gptproq config init                       # write ~/.gptproq with all defaults
 uv run gptproq login                             # prompt for the API key (hidden) and save it
 uv run gptproq config set mode batch             # background | batch
-uv run gptproq config set reasoning_effort xhigh # low | medium | high | xhigh (default)
+uv run gptproq config set reasoning_effort max   # low | medium | high | xhigh | max (default)
+uv run gptproq config set reasoning_mode pro     # standard | pro (default) — gpt-5.6 only
 uv run gptproq config set reasoning_summary auto # auto | concise | detailed | none
-uv run gptproq config set model gpt-5.5-pro
+uv run gptproq config set model gpt-5.6-sol      # or gpt-5.6-terra / gpt-5.6-luna
 uv run gptproq config get queue_dir
 uv run gptproq config path
 uv run gptproq config cat                        # print the whole config file
@@ -159,8 +161,11 @@ uv run gptproq sync -d ~/queue -n 600    # re-sync every 10 minutes
 
 ## Notes
 
-- Built for top-tier Pro reasoning; defaults to `gpt-5.5-pro` (you can set any
-  model, but that's the intent).
+- Built for top-tier reasoning; defaults to `gpt-5.6-sol` with `reasoning_effort
+  max` and `reasoning_mode pro` — the deepest, quality-first settings, chosen for
+  hard STEM/research questions. `reasoning_mode pro` makes gpt-5.6 do more work and
+  return a single final answer; set `standard` (or a lower effort) to trade quality
+  for speed/cost. You can set any model, but that's the intent.
 - Background responses have a limited retrieval window — run `sync` regularly; an
   unretrievable response is recorded as `expired` in `ERROR.txt`.
 - Transient API errors (timeouts, rate limits, 5xx) aren't recorded as failures;

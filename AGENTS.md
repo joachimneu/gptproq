@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) and other coding age
 
 ## What this is
 
-`gptproq` ("GPT Pro Queue") is a CLI that offloads large, curated reasoning prompts (plus attachments) to OpenAI's most capable models (default `gpt-5.5-pro`) and collects the answers later — a "submit now, retrieve later" job queue rather than an interactive chat. Python 3.12, managed with **uv**.
+`gptproq` ("GPT Pro Queue") is a CLI that offloads large, curated reasoning prompts (plus attachments) to OpenAI's most capable models (default `gpt-5.6-sol`) and collects the answers later — a "submit now, retrieve later" job queue rather than an interactive chat. Python 3.12, managed with **uv**.
 
 ## Commands
 
@@ -22,7 +22,7 @@ Module roles (read together to understand a change):
 - **`sync.py`** — the reconcile loop / state machine, the heart of the tool. `_drive` runs one prompt through transitions: `classify` the state from the magic files present → call that state's handler (`_on_new`/`_on_ready`/`_on_running`/`_on_done`/`_on_failed` via `_HANDLERS`) → the handler returns whether the prompt **advanced** to a state actionable now (loop again) or is now **waiting on the API / terminal** (stop until next `sync`). So a bare `PROMPT.md` advances new→ready→submitted in one run because only `_on_new` returns True. Owns per-prompt error isolation (transient → retry next run; terminal → `ERROR.txt`) and the cron summary.
 - **`backend.py`** — two backends behind one `submit`/`poll` interface, chosen by `mode`. **Both build the identical `/v1/responses` body** via `build_input()` — text/code attachments are concatenated into the prompt text and binaries are sent **inline as base64** `input_file`/`input_image` parts, so **no Files are uploaded for attachments**. `BackgroundBackend` = `responses.create(background=True, store=True)` + `responses.retrieve` (creates no Files). `BatchBackend` uploads the request as a uniquely-named JSONL (`gptproq-<custom_id>-<uuid>.jsonl`, `purpose="batch"`; batch tagged `metadata={tool, prompt}`), polls, parses the output by `custom_id`, then **deletes the input/output/error files it owns** (by id, best-effort). Add backends/models here.
 - **`store.py`** — filesystem layer: folder discovery, `classify`, magic-file paths, attachment gathering + content-type routing (`_route`: images→`input_image`; text/code→`input_text` (inlined by `build_input`); else→`input_file`), sha256, atomic writes, `CONFIG`/`STATE` read/write, `scaffold` (`prompt new`) and `clone` (`prompt clone` — copies inputs minus the generated files).
-- **`config.py`** + **`models.py`** — `~/.gptproq` (TOML, `0600`) and the Pydantic models/enums (`Status`, `Kind`, `Mode`, `Effort`, `TaskConfig`=`CONFIG.json`, `StateFile`=`STATE.json`).
+- **`config.py`** + **`models.py`** — `~/.gptproq` (TOML, `0600`) and the Pydantic models/enums (`Status`, `Kind`, `Mode`=delivery backend, `Effort`, `ReasoningMode`=gpt-5.6 `reasoning.mode` standard/pro, `TaskConfig`=`CONFIG.json`, `StateFile`=`STATE.json`).
 
 **Config layering:** built-in defaults → `~/.gptproq` (global) → per-prompt `CONFIG.json` (seeded by `gptproq new` or by the first `sync`, then the source of truth for that prompt). The API key comes **solely** from `~/.gptproq` — no env var.
 
@@ -30,12 +30,12 @@ Module roles (read together to understand a change):
 
 ## Conventions & gotchas
 
-- **Lean by design.** No test suite, no speculative abstractions; defaults to `gpt-5.5-pro` but does **not** restrict the model. Don't add tests/abstractions/guardrails unless asked. (The strict *config-file* validation above is an explicit, user-requested exception — it guards `~/.gptproq` integrity, not user inputs generally.)
+- **Lean by design.** No test suite, no speculative abstractions; defaults to `gpt-5.6-sol` but does **not** restrict the model. Don't add tests/abstractions/guardrails unless asked. (The strict *config-file* validation above is an explicit, user-requested exception — it guards `~/.gptproq` integrity, not user inputs generally.)
 - **`cli.py` must NOT use `from __future__ import annotations`** (Typer resolves annotations at runtime); every other module uses it. Typer params use `Annotated[...]` to avoid ruff `B008`.
 - ruff config in `pyproject.toml` (line-length 100; `E,F,I,UP,B`). Enums are `StrEnum` (`UP042`).
 - All magic-file writes go through `store.atomic_write`.
 - **Transient API errors** (timeouts, 429, 5xx; `backend.is_transient`) are not recorded — left for the next `sync`. Only terminal failures write `ERROR.txt`.
 - openai SDK is **v2.x**. Attachments are inlined as base64, never uploaded. Background mode requires `store=True` and creates no Files; the Batch API is the only path that creates Files (input JSONL + result files), which `BatchBackend.poll` deletes by owned id after reading results.
-- `reasoning_summary` (config; default `auto`) sets how much reasoning the model returns; `_request_body` sends `reasoning={effort, summary}`, `_extract_reasoning` collects the summary text, and `_on_running` appends it to `OUTPUT.md`. It only adds the summary's own (small) output tokens — the real cost lever is `reasoning_effort`. Detailed summaries on the latest models may require org verification; `reasoning_summary none` disables.
-- Defaults live in `models.py`: model `gpt-5.5-pro`, `reasoning_effort` `xhigh` (the max gpt-5.5-pro supports), `reasoning_summary` `auto`, `mode` `background`. Shell completion is Typer's built-in `--install-completion`/`--show-completion` (`add_completion=True`).
+- `reasoning_summary` (config; default `auto`) sets how much reasoning the model returns; `_request_body` sends `reasoning={effort, summary, mode}`, `_extract_reasoning` collects the summary text, and `_on_running` appends it to `OUTPUT.md`. It only adds the summary's own (small) output tokens — the real cost lever is `reasoning_effort`. Detailed summaries on the latest models may require org verification; `reasoning_summary none` disables.
+- Defaults live in `models.py`: model `gpt-5.6-sol`, `reasoning_effort` `max` (the deepest gpt-5.6 supports), `reasoning_mode` `pro` (gpt-5.6's `reasoning.mode`; more work, one final answer), `reasoning_summary` `auto`, `mode` `background`. `Mode` (delivery: background/batch) and `ReasoningMode` (standard/pro) are distinct — don't conflate them. Shell completion is Typer's built-in `--install-completion`/`--show-completion` (`add_completion=True`).
 - A local `queue/` is git-ignored (user prompt data, not part of the repo).

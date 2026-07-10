@@ -36,6 +36,7 @@ class Spec:
     model: str
     reasoning_effort: str | None
     reasoning_summary: str | None
+    reasoning_mode: str | None
     input: list[dict[str, Any]]
 
 
@@ -95,6 +96,8 @@ def _request_body(spec: Spec) -> dict[str, Any]:
         reasoning["effort"] = spec.reasoning_effort
     if spec.reasoning_summary and spec.reasoning_summary != "none":
         reasoning["summary"] = spec.reasoning_summary
+    if spec.reasoning_mode:
+        reasoning["mode"] = spec.reasoning_mode
     if reasoning:
         body["reasoning"] = reasoning
     return body
