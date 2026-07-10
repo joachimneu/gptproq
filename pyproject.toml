@@ -1,6 +1,6 @@
 [project]
 name = "gptproq"
-version = "0.3.0"
+version = "0.3.1"
 description = "GPT Pro Queue — a filesystem-as-database prompt job queue for OpenAI background reasoning jobs"
 readme = "README.md"
 requires-python = ">=3.12"

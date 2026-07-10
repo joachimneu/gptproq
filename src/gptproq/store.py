@@ -26,6 +26,7 @@ TEXT_EXTS = frozenset({
     ".go", ".java", ".c", ".h", ".cpp", ".cc", ".hpp", ".rb", ".sh", ".bash",
     ".zsh", ".json", ".jsonl", ".toml", ".yaml", ".yml", ".html", ".css",
     ".sql", ".r", ".kt", ".swift", ".php", ".lua", ".scala", ".ini", ".cfg",
+    ".lean",  # Lean theorem prover
     ".bib", ".aux", ".cls", ".sty", ".bbl",  # LaTeX / BibTeX (.tex already listed)
 })
 # fmt: on
